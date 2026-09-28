@@ -43,6 +43,33 @@ class SecurityHeaders(BaseHTTPMiddleware):
             response.headers["Content-Security-Policy"]="default-src 'self'; frame-ancestors 'none'"
         return response
 app.add_middleware(SecurityHeaders)
+from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    return JSONResponse(
+        status_code=422,
+        content={"detail": "Request validation failed", "errors": exc.errors(), "remediation": "Verify input types and required fields."}
+    )
+
+@app.exception_handler(ValueError)
+async def value_error_handler(request: Request, exc: ValueError):
+    return JSONResponse(
+        status_code=400,
+        content={"detail": str(exc), "remediation": "Check project configuration, medallion plan, or source connection parameters."}
+    )
+
+@app.exception_handler(RuntimeError)
+async def runtime_error_handler(request: Request, exc: RuntimeError):
+    msg = str(exc)
+    remediation = "Ensure local connector or database services are running and accessible."
+    if "CONNECTOR_OFFLINE" in msg:
+        remediation = "Start the local connector script in a terminal, verify the source ID, and ensure heartbeat is active."
+    elif "Databricks" in msg:
+        remediation = "Check your Databricks workspace URL, SQL warehouse HTTP path, and access token."
+    return JSONResponse(status_code=400, content={"detail": msg, "remediation": remediation})
+
 app.include_router(router)
 app.include_router(connector_router)
 @app.get("/health", tags=["System"])
