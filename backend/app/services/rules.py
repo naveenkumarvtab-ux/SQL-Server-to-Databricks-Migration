@@ -292,23 +292,20 @@ def rewrite_common_postgres(sql: str) -> str:
     out = re.sub(r'"([^"]+)"', r"`\1`", out)
     # Square bracket identifiers [my_col] -> `my_col`
     out = re.sub(r"\[([^\]]+)\]", r"`\1`", out)
-    # Convert PostgreSQL string_agg(col, ',') -> array_join(collect_list(col), ',') or concat_ws
-    # Convert common PostgreSQL casts like ::text, ::int, ::timestamp
-    out = re.sub(r"::text\b", "", out, flags=re.I)
-    out = re.sub(r"::varchar\b", "", out, flags=re.I)
-    out = re.sub(r"::jsonb?\b", "", out, flags=re.I)
-    out = re.sub(r"::int(?:eger|4)?\b", "", out, flags=re.I)
-    out = re.sub(r"::bigint\b", "", out, flags=re.I)
-    out = re.sub(r"::timestamp\b", "", out, flags=re.I)
-    out = re.sub(r"::date\b", "", out, flags=re.I)
-    out = re.sub(r"::boolean?\b", "", out, flags=re.I)
-    # ILIKE is supported in modern Databricks, but LIKE LOWER(...) is also safe
+    # Convert and strip PostgreSQL casts like ::text, ::varchar(n), ::numeric(p,s), ::int, ::timestamp, etc.
+    out = re.sub(r"::\s*(?:character\s+varying|varchar|character|char|bpchar|text|uuid|jsonb?|bytea|regclass|interval)(?:\s*\([^)]*\))?(?:\[\])?\b", "", out, flags=re.I)
+    out = re.sub(r"::\s*(?:numeric|decimal|float\d*|real|double\s+precision)(?:\s*\([^)]*\))?(?:\[\])?\b", "", out, flags=re.I)
+    out = re.sub(r"::\s*(?:bigint|int8|integer|int4|int2|int|smallint|serial|bigserial|smallserial|boolean|bool)(?:\s*\([^)]*\))?(?:\[\])?\b", "", out, flags=re.I)
+    out = re.sub(r"::\s*(?:timestamp(?:\s+without\s+time\s+zone|\s+with\s+time\s+zone)?|timestamptz|timestamp|date|time(?:\s+without\s+time\s+zone|\s+with\s+time\s+zone)?|timetz)(?:\s*\([^)]*\))?(?:\[\])?\b", "", out, flags=re.I)
+    out = re.sub(r"::\s*[a-zA-Z_][a-zA-Z0-9_]*(?:\s*\([^)]*\))?(?:\[\])?", "", out)
     return out
 
 
 def rewrite_source_sql(sql: str, source_type: str = "POSTGRESQL") -> str:
-    if source_type.upper() == "POSTGRESQL":
-        return rewrite_common_postgres(sql)
-    return rewrite_common_tsql(sql)
+    if not sql:
+        return sql
+    out = rewrite_common_postgres(sql)
+    out = rewrite_common_tsql(out)
+    return out
 
 

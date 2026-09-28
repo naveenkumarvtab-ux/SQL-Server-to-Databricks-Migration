@@ -38,7 +38,7 @@ from app.services.engine import (
     rewrite_common_tsql,
     uid,
 )
-from app.services.rules import classify_function, classify_procedure, classify_trigger, map_sqlserver_type
+from app.services.rules import classify_function, classify_procedure, classify_trigger, map_sqlserver_type, rewrite_source_sql, rewrite_common_postgres
 from app.core.config import get_settings
 from app.services.ai_remediation import call_structured_llm
 
@@ -1371,7 +1371,7 @@ def _stage_content(db: Session, project_id: str, node: MigrationMedallionNode, e
         if repaired:
             content = _retarget_view_header(repaired.content, node.target_fqn)
             return content, bool(content.strip()), [] if content.strip() else ["View definition empty"]
-        content = rewrite_common_tsql(obj.definition or "")
+        content = rewrite_source_sql(obj.definition or "")
         content = _replace_source_references(db, project_id, environment, content, for_gold=False)
         content = _retarget_view_header(content, node.target_fqn)
         return content, bool(content.strip()), [] if content.strip() else ["View definition empty"]

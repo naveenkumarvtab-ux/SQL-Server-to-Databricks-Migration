@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import select
 from app.models.entities import *
 from app.models.canonical import MigrationValidation
-from .rules import map_sqlserver_type, classify_layer, classify_procedure, classify_function, classify_trigger, rewrite_common_tsql
+from .rules import map_sqlserver_type, classify_layer, classify_procedure, classify_function, classify_trigger, rewrite_common_tsql, rewrite_common_postgres, rewrite_source_sql
 
 def uid(prefix: str) -> str: return f"{prefix}_{uuid.uuid4().hex}"
 def sha(text: str) -> str: return hashlib.sha256(text.encode()).hexdigest()
@@ -345,7 +345,7 @@ def _convert_function(db: Session, project_id: str, o: MigrationObject, m: Migra
     params=_routine_parameters(db,project_id,o.id)
     sig=_parameter_signature(params)
     ft,target=classify_function(definition)
-    rewritten=_replace_known_references(db,project_id,environment,_replace_parameters(rewrite_common_tsql(definition),params))
+    rewritten=_replace_known_references(db,project_id,environment,_replace_parameters(rewrite_source_sql(definition),params))
 
     # Inline table-valued function: RETURN (SELECT ...)
     if ft=="INLINE_TVF":
@@ -382,7 +382,7 @@ def _convert_procedure(db: Session, project_id: str, o: MigrationObject, m: Migr
     sig=_parameter_signature(params,procedure=True)
     intent,target=classify_procedure(definition)
     body=_clean_routine_body(definition)
-    body=_replace_parameters(rewrite_common_tsql(body),params)
+    body=_replace_parameters(rewrite_source_sql(body),params)
     body=_replace_known_references(db,project_id,environment,body)
     body=_rewrite_static_procedure_calls(body)
     low=body.lower()
@@ -432,7 +432,7 @@ def generate_artifact(db: Session, project_id: str, object_id: str, environment:
     elif o.object_type=="TRIGGER":
         intent,target=classify_trigger(o.definition or ""); content=f"-- TRIGGER_INTENT: {intent}\n-- RECOMMENDED_TARGET: {target}\n-- ARCHITECT_REVIEW_REQUIRED\n"+(o.definition or "")
     else:
-        content=rewrite_common_tsql(o.definition or "")
+        content=rewrite_source_sql(o.definition or "")
         # parser-assisted bounded reference replacement; only known object mappings are replaced
         content=_replace_known_references(db,project_id,environment,content)
         if o.object_type=="VIEW":
