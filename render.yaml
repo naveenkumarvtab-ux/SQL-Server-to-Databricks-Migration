@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: sql-server-to-databricks-migration
+    name: postgresql-to-databricks-migration
     runtime: docker
     plan: free
     region: singapore
