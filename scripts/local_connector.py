@@ -84,7 +84,7 @@ class LocalAgent:
 
     def cleanup(self, all_streams=False):
         for key, item in list(self.streams.items()):
-            if all_streams or time.monotonic() - item[2] > 150:
+            if all_streams or time.monotonic() - item[2] > 1800:
                 try:
                     item[0].close()
                 finally:
